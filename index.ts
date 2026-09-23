@@ -13,7 +13,7 @@ import {
 	CodexImagesClient,
 	FetchHttpTransport,
 } from "./src/client/codex-images.ts";
-import { ExtensionError, cancelledError } from "./src/errors.ts";
+import { ExtensionError } from "./src/errors.ts";
 import {
 	DefaultImageGenerator,
 	type GeneratedImage,
@@ -25,7 +25,6 @@ import {
 	type ReferenceImagePlanning,
 } from "./src/input/reference-images.ts";
 import { ImageStore } from "./src/output/image-store.ts";
-import { requiresExternalOutputPathApproval } from "./src/output/paths.ts";
 import type { GenerateImageRequest } from "./src/types.ts";
 
 // Oh My Pi rewrites the `typebox` specifier to its omptype-backed TypeBox shim at
@@ -122,7 +121,6 @@ export function createCodexImageExtension(
 					projectTrusted: ctx.isProjectTrusted(),
 				};
 				let referenceImages: PlannedReferenceImages | undefined;
-				let referenceUploadApproved = false;
 				if (request.referencedImagePaths !== undefined) {
 					try {
 						referenceImages = await referencePlanner.plan(
@@ -138,36 +136,6 @@ export function createCodexImageExtension(
 							),
 						);
 					}
-					if (!ctx.hasUI) {
-						throw toolError(
-							new ExtensionError(
-								"INPUT_IMAGE_APPROVAL_REQUIRED",
-								"Uploading local reference images requires interactive approval.",
-							),
-						);
-					}
-					referenceUploadApproved = await ctx.ui.confirm(
-						`Upload ${referenceImages.count} local image${referenceImages.count === 1 ? "" : "s"} to Codex?`,
-						`These files will leave this machine and be sent to Codex using the current Codex login:\n${referenceImages.displayPaths.join("\n")}`,
-					);
-					if (!referenceUploadApproved) throw toolError(cancelledError());
-				}
-
-				let externalOutputPathApproved = false;
-				if (requiresExternalOutputPathApproval(request, pathContext)) {
-					if (!ctx.hasUI) {
-						throw toolError(
-							new ExtensionError(
-								"INVALID_REQUEST",
-								"An absolute outputPath outside Pi or the trusted project requires interactive approval.",
-							),
-						);
-					}
-					externalOutputPathApproved = await ctx.ui.confirm(
-						"Allow image output outside safe roots?",
-						`Save the generated PNG to ${request.outputPath}?`,
-					);
-					if (!externalOutputPathApproved) throw toolError(cancelledError());
 				}
 
 				onUpdate?.({
@@ -186,9 +154,7 @@ export function createCodexImageExtension(
 						...pathContext,
 						modelRegistry: ctx.modelRegistry,
 						signal,
-						externalOutputPathApproved,
 						referenceImages,
-						referenceUploadApproved,
 					});
 					return toolResult(image, referenceImages !== undefined);
 				} catch (error) {

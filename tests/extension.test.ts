@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { createCodexImageExtension } from "../index.ts";
-import type { GeneratedImage, ImageGenerator } from "../src/image-generator.ts";
+import type { GenerateContext, GeneratedImage, ImageGenerator } from "../src/image-generator.ts";
 
 function fakePi() {
 	const handlers = new Map<string, (...args: any[]) => unknown>();
@@ -30,7 +30,11 @@ function toolContext(overrides: Record<string, unknown> = {}) {
 		modelRegistry: {},
 		sessionManager: { getSessionId: () => "session-id" },
 		isProjectTrusted: () => true,
-		ui: { confirm: async () => false },
+		ui: {
+			confirm: async () => {
+				throw new Error("codex_generate_image must not prompt for confirmation");
+			},
+		},
 		...overrides,
 	};
 }
@@ -86,12 +90,10 @@ test("package extension registers codex_generate_image", async () => {
 	assert.equal(JSON.stringify(result.details).includes("png-base64"), false);
 });
 
-test("extension plans references and confirms local image upload before editing", async () => {
-	const approvals: string[] = [];
-	const generatedContexts: unknown[] = [];
+test("extension edits with local references in headless mode without confirmation", async () => {
+	const generatedContexts: GenerateContext[] = [];
 	const referencePlan = {
 		count: 1,
-		displayPaths: ["/work/project/source.png"],
 		load: async () => [
 			{ dataUrl: "data:image/png;base64,c291cmNl", mimeType: "image/png" },
 		],
@@ -120,28 +122,16 @@ test("extension plans references and confirms local image upload before editing"
 		},
 		undefined,
 		undefined,
-		toolContext({
-			hasUI: true,
-			ui: {
-				confirm: async (title: string, message: string) => {
-					approvals.push(`${title}\n${message}`);
-					return true;
-				},
-			},
-		}),
+		toolContext(),
 	);
 
-	assert.equal(approvals.length, 1);
-	assert.match(approvals[0]!, /Upload 1 local image/);
-	assert.match(approvals[0]!, /source\.png/);
-	assert.equal((generatedContexts[0] as any).referenceImages, referencePlan);
-	assert.equal((generatedContexts[0] as any).referenceUploadApproved, true);
+	assert.equal(generatedContexts[0]?.referenceImages, referencePlan);
 	assert.match(result.content[0].text, /^Edited PNG/);
 	assert.equal(JSON.stringify(result.details).includes("source.png"), false);
 	assert.equal(JSON.stringify(result.details).includes("c291cmNl"), false);
 });
 
-test("extension treats an empty reference array as generation without upload approval", async () => {
+test("extension treats an empty reference array as generation", async () => {
 	let plannerCalled = false;
 	let generatedRequest: any;
 	const generator: ImageGenerator = {
@@ -174,75 +164,4 @@ test("extension treats an empty reference array as generation without upload app
 	assert.equal(plannerCalled, false);
 	assert.equal(generatedRequest.referencedImagePaths, undefined);
 	assert.match(result.content[0].text, /^Generated PNG/);
-});
-
-test("extension rejects local reference uploads in headless mode", async () => {
-	let generatorCalled = false;
-	const generator: ImageGenerator = {
-		generate: async () => {
-			generatorCalled = true;
-			return {
-				base64: "unexpected",
-				mimeType: "image/png",
-				model: "gpt-image-2",
-			};
-		},
-	};
-	const planner = {
-		plan: async () => ({
-			count: 1,
-			displayPaths: ["/work/project/source.png"],
-			load: async () => [],
-		}),
-	};
-	const pi = fakePi();
-	createCodexImageExtension(generator, planner)(pi.api as never);
-
-	await assert.rejects(
-		pi.tool.execute(
-			"call-id",
-			{ prompt: "edit", referencedImagePaths: ["source.png"] },
-			undefined,
-			undefined,
-			toolContext(),
-		),
-		/INPUT_IMAGE_APPROVAL_REQUIRED/,
-	);
-	assert.equal(generatorCalled, false);
-});
-
-test("extension requires UI approval for an absolute path outside safe roots", async () => {
-	const approvals: string[] = [];
-	const generator: ImageGenerator = {
-		generate: async (_request, context) => {
-			const image: GeneratedImage = {
-				base64: "png",
-				mimeType: "image/png",
-				model: "gpt-image-2",
-			};
-			if (context.externalOutputPathApproved) image.savedPath = "/tmp/fox.png";
-			return image;
-		},
-	};
-	const pi = fakePi();
-	createCodexImageExtension(generator)(pi.api as never);
-
-	const result = await pi.tool.execute(
-		"call-id",
-		{ prompt: "fox", outputPath: "/tmp/fox.png" },
-		undefined,
-		undefined,
-		toolContext({
-			hasUI: true,
-			ui: {
-				confirm: async (_title: string, message: string) => {
-					approvals.push(message);
-					return true;
-				},
-			},
-		}),
-	);
-
-	assert.equal(approvals.length, 1);
-	assert.equal(result.details.savedPath, "/tmp/fox.png");
 });

@@ -12,9 +12,7 @@ export interface GenerateContext {
   projectTrusted: boolean;
   modelRegistry: unknown;
   signal?: AbortSignal | undefined;
-  externalOutputPathApproved?: boolean | undefined;
   referenceImages?: PlannedReferenceImages | undefined;
-  referenceUploadApproved?: boolean | undefined;
 }
 
 export interface GeneratedImage {
@@ -74,7 +72,6 @@ export class DefaultImageGenerator implements ImageGenerator {
       agentDir: context.agentDir,
       sessionId: context.sessionId,
       projectTrusted: context.projectTrusted,
-      externalOutputPathApproved: context.externalOutputPathApproved,
     });
     const requestedReferences = request.referencedImagePaths?.length ?? 0;
     if (requestedReferences > 0 && context.referenceImages?.count !== requestedReferences) {
@@ -85,7 +82,7 @@ export class DefaultImageGenerator implements ImageGenerator {
     }
 
     const references = context.referenceImages
-      ? await context.referenceImages.load(context.referenceUploadApproved === true, context.signal)
+      ? await context.referenceImages.load(context.signal)
       : [];
     const auth = await this.dependencies.resolveAuth(context.modelRegistry);
     const imageRequest = {

@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import {
 	mkdtemp,
-	realpath,
 	rename,
 	rm,
 	stat,
@@ -105,7 +104,7 @@ function progressiveJpegWithAppHeader(width: number, height: number): Buffer {
 	return bytes;
 }
 
-test("ReferenceImagePlanner plans and loads approved project images in order", async (t) => {
+test("ReferenceImagePlanner plans and loads project images", async (t) => {
 	const root = await temporaryDirectory();
 	t.after(() => rm(root, { recursive: true, force: true }));
 	const first = join(root, "first.png");
@@ -120,17 +119,7 @@ test("ReferenceImagePlanner plans and loads approved project images in order", a
 	});
 
 	assert.equal(plan.count, 2);
-	assert.deepEqual(plan.displayPaths, [
-		await realpath(first),
-		await realpath(second),
-	]);
-	await assert.rejects(
-		plan.load(false),
-		(error: unknown) =>
-			error instanceof ExtensionError &&
-			error.code === "INPUT_IMAGE_APPROVAL_REQUIRED",
-	);
-	const loaded = await plan.load(true);
+	const loaded = await plan.load();
 	assert.deepEqual(
 		loaded.map((image) => image.dataUrl),
 		[
@@ -150,7 +139,7 @@ test("ReferenceImagePlanner decodes a real PNG with the production normalizer", 
 		projectTrusted: true,
 	});
 
-	const [loaded] = await plan.load(true);
+	const [loaded] = await plan.load();
 
 	assert.equal(loaded?.mimeType, "image/png");
 	assert.match(loaded?.dataUrl ?? "", /^data:image\/png;base64,/);
@@ -169,7 +158,7 @@ test("ReferenceImagePlanner rejects excessive PNG pixels before decoding", async
 	const plan = await planner.plan([image], { cwd: root, projectTrusted: true });
 
 	await assert.rejects(
-		plan.load(true),
+		plan.load(),
 		(error: unknown) =>
 			error instanceof ExtensionError && error.code === "INPUT_IMAGE_TOO_LARGE",
 	);
@@ -189,7 +178,7 @@ test("ReferenceImagePlanner rejects excessive image dimensions before decoding",
 	const plan = await planner.plan([image], { cwd: root, projectTrusted: true });
 
 	await assert.rejects(
-		plan.load(true),
+		plan.load(),
 		(error: unknown) =>
 			error instanceof ExtensionError && error.code === "INPUT_IMAGE_TOO_LARGE",
 	);
@@ -209,7 +198,7 @@ test("ReferenceImagePlanner rejects excessive JPEG pixels before decoding", asyn
 	const plan = await planner.plan([image], { cwd: root, projectTrusted: true });
 
 	await assert.rejects(
-		plan.load(true),
+		plan.load(),
 		(error: unknown) =>
 			error instanceof ExtensionError && error.code === "INPUT_IMAGE_TOO_LARGE",
 	);
@@ -229,7 +218,7 @@ test("ReferenceImagePlanner rejects excessive WebP pixels before decoding", asyn
 	const plan = await planner.plan([image], { cwd: root, projectTrusted: true });
 
 	await assert.rejects(
-		plan.load(true),
+		plan.load(),
 		(error: unknown) =>
 			error instanceof ExtensionError && error.code === "INPUT_IMAGE_TOO_LARGE",
 	);
@@ -249,7 +238,7 @@ test("ReferenceImagePlanner rejects zero WebP dimensions before decoding", async
 	const plan = await planner.plan([image], { cwd: root, projectTrusted: true });
 
 	await assert.rejects(
-		plan.load(true),
+		plan.load(),
 		(error: unknown) =>
 			error instanceof ExtensionError && error.code === "INPUT_IMAGE_INVALID",
 	);
@@ -280,7 +269,7 @@ test("ReferenceImagePlanner passes safe JPEG and WebP variants to the normalizer
 		},
 	);
 
-	const loaded = await plan.load(true);
+	const loaded = await plan.load();
 
 	assert.equal(loaded.length, 4);
 	assert.deepEqual(normalizedMimeTypes, [
@@ -308,14 +297,14 @@ test("ReferenceImagePlanner enforces exact dimension and pixel boundaries", asyn
 		cwd: root,
 		projectTrusted: true,
 	});
-	assert.equal((await allowed.load(true)).length, 2);
+	assert.equal((await allowed.load()).length, 2);
 	for (const image of [overDimension, overPixels]) {
 		const rejected = await planner.plan([image], {
 			cwd: root,
 			projectTrusted: true,
 		});
 		await assert.rejects(
-			rejected.load(true),
+			rejected.load(),
 			(error: unknown) =>
 				error instanceof ExtensionError &&
 				error.code === "INPUT_IMAGE_TOO_LARGE",
@@ -337,9 +326,9 @@ test("ReferenceImagePlanner accepts five images and treats zero images as an emp
 	const empty = await planner.plan([], { cwd: root, projectTrusted: true });
 
 	assert.equal(five.count, 5);
-	assert.equal((await five.load(true)).length, 5);
+	assert.equal((await five.load()).length, 5);
 	assert.equal(empty.count, 0);
-	assert.deepEqual(await empty.load(false), []);
+	assert.deepEqual(await empty.load(), []);
 });
 
 test("ReferenceImagePlanner rejects more than five images before file access", async () => {
@@ -363,7 +352,7 @@ test("ReferenceImagePlanner rejects relative paths in an untrusted project", asy
 	);
 });
 
-test("planned references reject a file swapped after upload approval", async (t) => {
+test("planned references reject a file swapped after planning", async (t) => {
 	const root = await temporaryDirectory();
 	t.after(() => rm(root, { recursive: true, force: true }));
 	const image = join(root, "image.png");
@@ -383,7 +372,7 @@ test("planned references reject a file swapped after upload approval", async (t)
 	await rename(replacement, image);
 
 	await assert.rejects(
-		plan.load(true),
+		plan.load(),
 		(error: unknown) =>
 			error instanceof ExtensionError && error.code === "INPUT_IMAGE_CHANGED",
 	);
@@ -408,7 +397,7 @@ test("planned references reject same-inode content changes even when size and mt
 	await utimes(image, original.atime, original.mtime);
 
 	await assert.rejects(
-		plan.load(true),
+		plan.load(),
 		(error: unknown) =>
 			error instanceof ExtensionError && error.code === "INPUT_IMAGE_CHANGED",
 	);
@@ -434,7 +423,7 @@ test("planned references observe cancellation during normalization", async (t) =
 		projectTrusted: true,
 	});
 	const controller = new AbortController();
-	const loading = plan.load(true, controller.signal);
+	const loading = plan.load(controller.signal);
 	await started;
 	controller.abort();
 
@@ -459,7 +448,7 @@ test("planned references reject unsupported or corrupt images", async (t) => {
 	);
 
 	await assert.rejects(
-		plan.load(true),
+		plan.load(),
 		(error: unknown) =>
 			error instanceof ExtensionError && error.code === "INPUT_IMAGE_INVALID",
 	);

@@ -89,7 +89,7 @@ test("DefaultImageGenerator can preview without saving and never passes bytes in
   assert.equal(saveCalled, false);
 });
 
-test("DefaultImageGenerator loads approved references before auth and calls edit", async () => {
+test("DefaultImageGenerator loads references before auth and calls edit", async () => {
   const events: string[] = [];
   const generator = new DefaultImageGenerator({
     resolveAuth: async () => {
@@ -109,56 +109,22 @@ test("DefaultImageGenerator loads approved references before auth and calls edit
   });
   const referenceImages = {
     count: 1,
-    displayPaths: ["/work/project/source.png"],
-    load: async (approved: boolean) => {
-      events.push(`load:${approved}`);
+    load: async () => {
+      events.push("load");
       return [{ dataUrl: "data:image/png;base64,c291cmNl", mimeType: "image/png" }];
     },
   };
 
   await generator.generate(
     { prompt: "Replace only the background", referencedImagePaths: ["source.png"], save: "none" },
-    context({ referenceImages, referenceUploadApproved: true }),
+    context({ referenceImages }),
   );
 
   assert.deepEqual(events, [
-    "load:true",
+    "load",
     "auth",
     "edit:data:image/png;base64,c291cmNl",
   ]);
-});
-
-test("DefaultImageGenerator rejects missing reference approval before auth", async () => {
-  let authCalled = false;
-  const generator = new DefaultImageGenerator({
-    resolveAuth: async () => {
-      authCalled = true;
-      return auth;
-    },
-    client: {
-      generate: async () => ({ base64: PNG_BASE64 }),
-      edit: async () => ({ base64: PNG_BASE64 }),
-    },
-    store: { save: async () => "unused" },
-  });
-  const referenceImages = {
-    count: 1,
-    displayPaths: ["/work/project/source.png"],
-    load: async (approved: boolean) => {
-      if (!approved) throw new ExtensionError("INPUT_IMAGE_APPROVAL_REQUIRED", "approval required");
-      return [];
-    },
-  };
-
-  await assert.rejects(
-    generator.generate(
-      { prompt: "edit", referencedImagePaths: ["source.png"], save: "none" },
-      context({ referenceImages, referenceUploadApproved: false }),
-    ),
-    (error: unknown) =>
-      error instanceof ExtensionError && error.code === "INPUT_IMAGE_APPROVAL_REQUIRED",
-  );
-  assert.equal(authCalled, false);
 });
 
 test("DefaultImageGenerator validates the request before auth or network", async () => {

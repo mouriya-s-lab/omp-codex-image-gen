@@ -19,9 +19,10 @@ Codex service and may change.
 - Pass `referencedImagePaths` only for one to five local PNG, JPEG, or WebP files
   the user explicitly wants uploaded to Codex. Preserve their intended order
   and describe each image's role in the prompt.
-- Local reference uploads require interactive approval. If the user only
-  attached an image without a usable local path, explain that direct
-  conversation-image selection is not supported yet and ask for its path.
+- Local reference files are uploaded without an interactive prompt, so pass
+  only paths the user intends to send. If the user only attached an image
+  without a usable local path, explain that direct conversation-image
+  selection is not supported yet and ask for its path.
 - Pass `outputPath` only when the user asks for a specific destination.
 - Otherwise leave `save` as `auto`: trusted projects save under
   `.pi/generated-images/`; untrusted projects save under the global Pi agent

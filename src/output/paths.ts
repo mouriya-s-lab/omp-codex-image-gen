@@ -9,7 +9,6 @@ export interface OutputContext {
   agentDir: string;
   sessionId: string;
   projectTrusted: boolean;
-  externalOutputPathApproved?: boolean | undefined;
 }
 
 export interface ApprovedRootAnchor {
@@ -25,20 +24,6 @@ export type OutputPlan =
       desiredPath: string;
       approvedRoot: ApprovedRootAnchor;
     };
-
-export function requiresExternalOutputPathApproval(
-  request: GenerateImageRequest,
-  context: OutputContext,
-): boolean {
-  if (!request.outputPath) return false;
-  const trimmed = request.outputPath.trim().replace(/^@/, "");
-  if (!isAbsolute(trimmed)) return false;
-  const resolvedPath = resolve(trimmed);
-  return !(
-    (context.projectTrusted && isWithin(context.cwd, resolvedPath)) ||
-    isWithin(context.agentDir, resolvedPath)
-  );
-}
 
 export function resolveOutputPlan(request: GenerateImageRequest, context: OutputContext): OutputPlan {
   const saveMode = request.save ?? "auto";
@@ -99,10 +84,7 @@ function resolveExplicitPath(
   if (inAgentDir) {
     return { desiredPath: resolvedPath, approvedRoot: captureApprovedRoot(context.agentDir) };
   }
-  if (context.externalOutputPathApproved) {
-    return { desiredPath: resolvedPath, approvedRoot: captureApprovedRoot(dirname(resolvedPath)) };
-  }
-  throw invalidPath("Writing to this absolute outputPath requires explicit approval.");
+  return { desiredPath: resolvedPath, approvedRoot: captureApprovedRoot(dirname(resolvedPath)) };
 }
 
 function isWithin(root: string, candidate: string): boolean {

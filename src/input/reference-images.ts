@@ -55,11 +55,7 @@ export interface ReferenceImagePlanning {
 
 export interface PlannedReferenceImages {
 	readonly count: number;
-	readonly displayPaths: readonly string[];
-	load(
-		approved: boolean,
-		signal?: AbortSignal,
-	): Promise<ResolvedReferenceImage[]>;
+	load(signal?: AbortSignal): Promise<ResolvedReferenceImage[]>;
 }
 
 interface PlannedFile {
@@ -104,7 +100,6 @@ export class ReferenceImagePlanner implements ReferenceImagePlanning {
 		if (paths.length === 0) {
 			return {
 				count: 0,
-				displayPaths: [],
 				load: async () => [],
 			};
 		}
@@ -183,9 +178,7 @@ export class ReferenceImagePlanner implements ReferenceImagePlanning {
 		const normalize = this.normalize;
 		return {
 			count: files.length,
-			displayPaths: files.map((file) => file.canonicalPath),
-			load: (approved, signal) =>
-				loadPlannedFiles(files, normalize, approved, signal),
+			load: (signal) => loadPlannedFiles(files, normalize, signal),
 		};
 	}
 }
@@ -193,16 +186,8 @@ export class ReferenceImagePlanner implements ReferenceImagePlanning {
 async function loadPlannedFiles(
 	files: readonly PlannedFile[],
 	normalize: ImageNormalizer,
-	approved: boolean,
 	signal?: AbortSignal,
 ): Promise<ResolvedReferenceImage[]> {
-	if (!approved) {
-		throw new ExtensionError(
-			"INPUT_IMAGE_APPROVAL_REQUIRED",
-			"Uploading local reference images to Codex requires explicit approval.",
-		);
-	}
-
 	const images: ResolvedReferenceImage[] = [];
 	let totalDataUrlChars = 0;
 	for (const file of files) {

@@ -73,7 +73,7 @@ test("resolveOutputPlan rejects untrusted project saves and path traversal", () 
   );
 });
 
-test("resolveOutputPlan honors explicit paths only inside an approved root", () => {
+test("resolveOutputPlan honors explicit relative paths in a trusted project and absolute paths anywhere", () => {
   const context = {
     cwd: "/work/project",
     agentDir: "/home/me/.pi/agent",
@@ -85,17 +85,8 @@ test("resolveOutputPlan honors explicit paths only inside an approved root", () 
     "/work/project/assets/hero.png",
   );
   assert.equal(
-    desiredPath(
-      resolveOutputPlan(
-        { prompt: "fox", outputPath: "/tmp/export.png" },
-        { ...context, externalOutputPathApproved: true },
-      ),
-    ),
+    desiredPath(resolveOutputPlan({ prompt: "fox", outputPath: "/tmp/export.png" }, context)),
     "/tmp/export.png",
-  );
-  assert.throws(
-    () => resolveOutputPlan({ prompt: "fox", outputPath: "/tmp/export.png" }, context),
-    (error: unknown) => error instanceof ExtensionError && error.code === "INVALID_REQUEST",
   );
   assert.throws(
     () => resolveOutputPlan({ prompt: "fox", outputPath: "hero.png", save: "none" }, context),

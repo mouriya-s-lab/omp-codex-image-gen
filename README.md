@@ -19,7 +19,7 @@ were repaired (see [Port notes](#port-notes)).
 - Generate one PNG from a natural-language prompt.
 - Edit or derive from one to five local PNG, JPEG, or WebP images.
 - Preview every result inline and save it automatically by default.
-- Require interactive approval before local reference images leave the machine.
+- Run without interactive confirmation, including headless sessions.
 - Keep OAuth tokens, backend responses, and image bytes out of result metadata.
 - Bound input dimensions, request sizes, response sizes, and retries.
 - Save atomically without silently overwriting existing files.
@@ -42,7 +42,7 @@ omp install npm:omp-codex-image-gen
 Try a specific version without adding it to settings:
 
 ```bash
-omp -e npm:omp-codex-image-gen@0.2.2
+omp -e npm:omp-codex-image-gen@0.3.0
 ```
 
 ### Local checkout
@@ -121,19 +121,17 @@ users never need to set them manually.
 
 `outputPath` takes precedence over the automatic `project` or `global` location
 and cannot be combined with `save: "none"`. Relative paths require a trusted
-project and must stay inside it. An absolute path outside the trusted project or
-the `omp` agent directory requires interactive approval and therefore fails in
-headless mode. Existing files are never silently overwritten; a collision
+project and must stay inside it. An absolute path may point anywhere writable.
+Existing files are never silently overwritten; a collision
 receives a numeric suffix, which is reflected in the returned `savedPath`.
 
 </details>
 
-### Reference-image approval
+### Reference images
 
-Supplying `referencedImagePaths` switches from generation to editing. Before
-reading or uploading local bytes, `omp` displays the resolved paths and asks for
-interactive confirmation. Headless runs reject reference uploads, and relative
-paths require a trusted project.
+Supplying `referencedImagePaths` switches from generation to editing. The listed
+local files are read and uploaded to Codex without an interactive prompt,
+including in headless runs. Relative paths require a trusted project.
 
 Direct selection of attached or recent conversation images is not implemented;
 provide a local path instead.
