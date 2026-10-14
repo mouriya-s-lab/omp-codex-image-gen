@@ -1,5 +1,7 @@
 # Oh My Pi Codex Image Gen
 
+English | [简体中文](README.zh-CN.md)
+
 Generate and edit PNG images in [Oh My Pi](https://omp.sh/) (`omp`) through the
 same ChatGPT-backed Codex Images flow used by the built-in Codex CLI experience.
 Authentication comes from the ChatGPT Plus/Pro Codex login already managed by
@@ -33,19 +35,18 @@ were repaired (see [Port notes](#port-notes)).
 
 ## Installation
 
-### npm
+The package is not published to npm; install it from GitHub:
 
 ```bash
-omp install npm:omp-codex-image-gen
+omp install https://github.com/oh-my-omp/omp-codex-image-gen
 ```
 
-Try a specific version without adding it to settings:
-
-```bash
-omp -e npm:omp-codex-image-gen@0.3.0
-```
+A GitHub install tracks the default branch; re-run the same command to update,
+then restart `omp`.
 
 ### Local checkout
+
+Load a checkout for one session without changing `omp` settings:
 
 ```bash
 omp -e /absolute/path/to/omp-codex-image-gen
@@ -172,9 +173,9 @@ do not exist (or moved) in `omp`, so they were repaired:
   changed signature (`resizeImage(ImageContent, options)` returning an object
   whose `.data` is the base64 payload). `src/input/reference-images.ts` adapts
   its default normalizer accordingly.
-- The removed `StringEnum` (`pi-ai`) and `ctx.signal` are gone; `index.ts`
-  builds the same `{ type: "string", enum: [...] }` schema from the TypeBox
-  facade and relies solely on the tool `execute` abort signal.
+- `StringEnum` (`pi-ai`) and `ctx.signal` were removed. `index.ts` builds the
+  same `{ type: "string", enum: [...] }` wire schema as a union of TypeBox
+  literals and relies solely on the tool `execute` abort signal.
 
 ## Limitations
 
